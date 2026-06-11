@@ -124,14 +124,14 @@ auto w32_window::resize_buffer(int width, int height) -> void
     .height = height,
   };
 
-  backbuffer.pixels.resize(width * height, 0xFF0000FF);
+  backbuffer.pixels.resize(width * height, 0x00000000);
 }
 
 auto w32_window::render() -> void
 {
   auto dc { w32_device_context(window) };
   StretchDIBits(dc.value(),
-                0, 0, backbuffer.width, backbuffer.height,
+                0, 0, width(), height(),
                 0, 0, backbuffer.width, backbuffer.height,
                 backbuffer.pixels.data(),
                 &backbuffer.info,
