@@ -4,9 +4,7 @@
 
 # Building
 
-You can run the provided batch file (requires CMake, Ninja, and a C++ 23+ compiler (GCC, clang, cl, etc.)) to quickly produce a working executable.
-
-In cmd.exe:
+In `cmd.exe` **run the provided `build.bat` file** (requires CMake, Ninja, and a C++ 23+ compiler such as GCC, clang, cl, etc.) to quickly produce a working executable.
 
 ```
 build.bat
