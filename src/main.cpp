@@ -1,4 +1,4 @@
-#include <windows.h>
+#include <Windows.h>
 
 #include <cassert>
 #include <cstdint>
@@ -12,7 +12,21 @@ struct vec2 {
    NumberT y;
 };
 
+static int64_t PerfCountFrequency;
+
 namespace win32 {
+
+auto get_wall_clock() -> LARGE_INTEGER
+{
+   LARGE_INTEGER result;
+   QueryPerformanceCounter(&result);
+   return result;
+}
+
+auto get_seconds_elapsed(LARGE_INTEGER start, LARGE_INTEGER end) -> float
+{
+   return static_cast<float>(end.QuadPart - start.QuadPart) / static_cast<float>(PerfCountFrequency);
+}
 
 class device_context {
 public:
@@ -240,10 +254,23 @@ auto main_window_callback(HWND window_handle, UINT message, WPARAM wparam, LPARA
 
 } // END namespace
 
+constexpr const auto TargetFPS { 60 };
+
 auto WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, int cmd_show) -> int
 {
    auto window { win32::window(instance, "Win32 Pong", "Win32PongWindowClass", main_window_callback) };
    assert(window.is_open());
+
+   LARGE_INTEGER perf_count_frequency_result;
+   QueryPerformanceFrequency(&perf_count_frequency_result);
+   PerfCountFrequency = perf_count_frequency_result.QuadPart;
+
+   auto desired_scheduler_ms { 1 };
+   auto sleep_is_granular { (timeBeginPeriod(desired_scheduler_ms) == TIMERR_NOERROR) };
+
+   auto last_counter { win32::get_wall_clock() };
+   auto game_update_hz { static_cast<float>(TargetFPS / 2.0f) };
+   auto target_seconds_per_frame { 1.0f / game_update_hz };
 
    Running = true;
    while (Running) {
@@ -253,12 +280,28 @@ auto WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, int cm
          DispatchMessage(&msg);
       }
 
-      // draw_weird_gradient(window);
-
       auto buffer { window.get_backbuffer() };
       draw_rectangle(window, rectangle{ 10, (buffer->height - 125) / 2, 10, 125 }, color_rgba{ 0xFF, 0xFF, 0xFF, 0xFF });
       draw_rectangle(window, rectangle{ buffer->width - 10 - 10, (buffer->height - 125) / 2, 10, 125 }, color_rgba{ 0xFF, 0xFF, 0xFF, 0xFF });
-      draw_rectangle(window, rectangle{ (buffer->width - 10) / 2, (buffer->height - 10) / 2, 10, 10 }, color_rgba{0xff, 0xff, 0xff, 0xff});
+      draw_rectangle(window, rectangle{ (buffer->width - 10) / 2, (buffer->height - 10) / 2, 10, 10 }, color_rgba{ 0xFF, 0xFF, 0xFF, 0xFF });
+
+      auto work_counter { win32::get_wall_clock() };
+
+      auto seconds_elapsed_for_frame { win32::get_seconds_elapsed(last_counter, work_counter) };
+      if (seconds_elapsed_for_frame < target_seconds_per_frame) {
+         if (sleep_is_granular) {
+            auto sleep_ms { static_cast<DWORD>(1000.0f * (target_seconds_per_frame - seconds_elapsed_for_frame)) };
+            if (sleep_ms > 0) {
+               Sleep(sleep_ms);
+            }
+         }
+
+         while (seconds_elapsed_for_frame < target_seconds_per_frame) {
+            seconds_elapsed_for_frame = win32::get_seconds_elapsed(last_counter, win32::get_wall_clock());
+         }
+      }
+      auto end_counter { win32::get_wall_clock() };
+      last_counter = end_counter;
 
       window.render();
    }
